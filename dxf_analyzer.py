@@ -14,8 +14,31 @@ import logging
 from pathlib import Path
 import json
 from datetime import datetime
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+"""tkinter는 데스크톱 GUI에서만 필요하며, 일부 서버 환경(예: Streamlit Cloud)에는 설치되어 있지 않을 수 있습니다.
+   불필요한 ImportError를 방지하기 위해 optional import 패턴을 사용합니다."""
+
+try:
+    import tkinter as tk  # type: ignore
+    from tkinter import ttk, messagebox, filedialog  # type: ignore
+    TKINTER_AVAILABLE = True
+except ImportError:
+    # tkinter가 없는 환경에서도 모듈 임포트가 가능하도록 더미 변수를 정의
+    from types import SimpleNamespace
+
+    class _TkDummy(SimpleNamespace):
+        """tkinter가 없는 환경에서도 속성 접근 오류를 방지하기 위한 더미 객체"""
+
+        def __getattr__(self, item):  # noqa: D401,E501
+            return _TkDummy()
+
+        def __call__(self, *args, **kwargs):  # noqa: D401
+            return _TkDummy()
+
+    tk = _TkDummy()  # type: ignore
+    ttk = _TkDummy()  # type: ignore
+    messagebox = _TkDummy()  # type: ignore
+    filedialog = _TkDummy()  # type: ignore
+    TKINTER_AVAILABLE = False
 import threading
 import math
 
@@ -859,9 +882,6 @@ def check_dependencies():
 def run_gui_version():
     """GUI 버전 실행"""
     try:
-        import tkinter as tk
-        from tkinter import messagebox
-
         logger.info("GUI 버전을 시작합니다...")
 
         # GUI 애플리케이션 클래스들이 이미 정의되어 있다고 가정
