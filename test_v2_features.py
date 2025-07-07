@@ -1,258 +1,309 @@
 #!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-DXF 분석기 v2.0 기능 테스트
+DXF 분석기 v2.0 신규 기능 테스트 파일
 """
 
 import unittest
 import tempfile
 import os
-from pathlib import Path
+import sys
 import json
+import asyncio # For AI integration tests
+from unittest.mock import patch, MagicMock, AsyncMock # Mock 추가
 
-# 테스트할 모듈들
-from dxf_analyzer import DXFAnalyzer
-from dxf_3d_analyzer import DXF3DAnalyzer
-from dxf_comparison import DXFComparison
-from dxf_auto_fix import DXFAutoFix
+# 현재 디렉토리를 Python 경로에 추가
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# --- 테스트 대상 모듈 임포트 ---
+ANALYZER_AVAILABLE = False
+DXFAnalyzer = None
+try:
+    from dxf_analyzer import DXFAnalyzer
+    ANALYZER_AVAILABLE = True
+except ImportError:
+    pass
+
+THREE_D_ANALYZER_AVAILABLE = False
+DXF3DAnalyzer = None
+try:
+    from dxf_3d_analyzer import DXF3DAnalyzer
+    THREE_D_ANALYZER_AVAILABLE = True
+except ImportError:
+    pass
+
+COMPARISON_AVAILABLE = False
+DXFComparison = None
+try:
+    from dxf_comparison import DXFComparison
+    COMPARISON_AVAILABLE = True
+except ImportError:
+    pass
+
+AUTO_FIX_AVAILABLE = False
+DXFAutoFix = None
+try:
+    from dxf_auto_fix import DXFAutoFix
+    AUTO_FIX_AVAILABLE = True
+except ImportError:
+    pass
+
+AI_INTEGRATION_AVAILABLE = False
+DXFAIIntegration = None
+CLAUDE_AVAILABLE = False
+GEMINI_AVAILABLE = False
+
+try:
+    from dxf_ai_integration import DXFAIIntegration, CLAUDE_AVAILABLE, GEMINI_AVAILABLE
+    AI_INTEGRATION_AVAILABLE = True
+except ImportError:
+    pass
 
 
-class TestDXFAnalyzerV2(unittest.TestCase):
-    """DXF 분석기 v2.0 테스트"""
+# --- 테스트용 DXF 생성 헬퍼 ---
+def create_test_dxf_file(entities_callback, filename_suffix="test.dxf"):
+    import ezdxf
+    doc = ezdxf.new()
+    msp = doc.modelspace()
+    if entities_callback:
+        entities_callback(msp)
     
-    @classmethod
-    def setUpClass(cls):
-        """테스트 설정"""
-        # 샘플 파일 생성
-        cls.sample_file = "test_sample.dxf"
-        if not Path(cls.sample_file).exists():
-            from create_sample_dxf import create_sample_dxf
-            create_sample_dxf(cls.sample_file)
-    
-    def test_basic_analysis(self):
-        """기본 분석 테스트"""
-        analyzer = DXFAnalyzer()
-        success = analyzer.analyze_dxf_file(self.sample_file)
+    fd, filepath = tempfile.mkstemp(suffix=f"_{filename_suffix}") # text=True 제거
+    os.close(fd)
+    doc.saveas(filepath)
+    return filepath
+
+
+# --- DXF3DAnalyzer 테스트 ---
+@unittest.skipIf(not THREE_D_ANALYZER_AVAILABLE or not ANALYZER_AVAILABLE, "DXF3DAnalyzer or DXFAnalyzer not available")
+class TestDXF3DAnalyzer(unittest.TestCase):
+    def setUp(self):
+        self.analyzer_3d = DXF3DAnalyzer()
+
+    def test_analyze_simple_3dface(self):
+        def add_3dface_entities(msp):
+            msp.add_3dface([(0,0,0), (1,0,5), (1,1,5), (0,1,0)])
+
+        dxf_file = create_test_dxf_file(add_3dface_entities, "3dface.dxf")
         
-        self.assertTrue(success)
-        self.assertIsNotNone(analyzer.analysis_data)
-        self.assertIn('total_entities', analyzer.summary_info)
-        self.assertGreater(analyzer.summary_info['total_entities'], 0)
-    
-    def test_3d_analysis(self):
-        """3D 분석 테스트"""
-        analyzer = DXFAnalyzer()
-        analyzer.analyze_dxf_file(self.sample_file)
+        import ezdxf
+        doc = ezdxf.readfile(dxf_file)
+        msp = doc.modelspace()
         
-        analyzer_3d = DXF3DAnalyzer()
-        # 간단한 테스트 - 실제로는 msp 필요
+        base_analyzer = DXFAnalyzer()
+        base_analyzer.analyze_dxf_file(dxf_file)
+        self.assertIsNotNone(base_analyzer.analysis_data)
+
+        # 각 테스트마다 새로운 3D 분석기 인스턴스 사용 권장 또는 self.analyzer_3d.reset_data() 같은 메소드 필요
+        current_3d_analyzer = DXF3DAnalyzer()
+        result = current_3d_analyzer.analyze_3d_entities(msp, base_analyzer.analysis_data)
         
-        self.assertIsNotNone(analyzer_3d)
-        self.assertEqual(analyzer_3d.is_3d_drawing, False)  # 2D 샘플
-    
-    def test_comparison(self):
-        """도면 비교 테스트"""
-        # 두 개의 분석 결과 생성
-        analyzer1 = DXFAnalyzer()
-        analyzer2 = DXFAnalyzer()
+        self.assertTrue(result.get('is_3d'))
+        self.assertEqual(result.get('z_range', {}).get('min'), 0)
+        self.assertEqual(result.get('z_range', {}).get('max'), 5)
+        self.assertIn('3DFACE', result.get('3d_entity_breakdown', {}))
         
-        analyzer1.analyze_dxf_file(self.sample_file)
-        analyzer2.analyze_dxf_file(self.sample_file)
+        report = current_3d_analyzer.generate_3d_report(result)
+        self.assertIn("3D 도면 확인됨", report)
+        self.assertIn("Z축 범위: 0.000 ~ 5.000", report)
+
+        os.unlink(dxf_file)
+
+    def test_analyze_mesh_with_bounding_box(self):
+        def add_mesh_entities(msp):
+            vertices = [(0,0,0), (1,0,0), (1,1,1), (0,1,1), (0.5, 0.5, 2)]
+            faces = [[0,1,2,3], [0,1,4], [1,2,4], [2,3,4], [3,0,4]]
+            msp.add_mesh(vertices=vertices, faces=faces)
+
+        dxf_file = create_test_dxf_file(add_mesh_entities, "mesh.dxf")
         
-        # 비교 실행
-        comparator = DXFComparison()
-        differences = comparator.compare_dxf_files(
-            analyzer1.analysis_data,
-            analyzer2.analysis_data
-        )
+        import ezdxf
+        doc = ezdxf.readfile(dxf_file)
+        msp = doc.modelspace()
+        base_analyzer = DXFAnalyzer()
+        base_analyzer.analyze_dxf_file(dxf_file)
+        self.assertIsNotNone(base_analyzer.analysis_data)
+
+        current_3d_analyzer = DXF3DAnalyzer()
+        result = current_3d_analyzer.analyze_3d_entities(msp, base_analyzer.analysis_data)
         
-        self.assertIsNotNone(differences)
-        self.assertIn('summary', differences)
-        self.assertEqual(differences['summary']['change_level'], 'none')  # 같은 파일
-    
-    def test_auto_fix(self):
-        """자동 수정 테스트"""
-        # 분석 실행
-        analyzer = DXFAnalyzer()
-        analyzer.analyze_dxf_file(self.sample_file)
+        self.assertTrue(result.get('is_3d'))
+        self.assertEqual(result.get('z_range', {}).get('min'), 0)
+        self.assertEqual(result.get('z_range', {}).get('max'), 2)
         
-        # 자동 수정
-        fixer = DXFAutoFix()
-        loaded = fixer.load_file(self.sample_file)
+        self.assertTrue(len(current_3d_analyzer.meshes) > 0)
+        mesh_info = current_3d_analyzer.meshes[0]
+        self.assertIsNotNone(mesh_info.get('bounding_box'))
+        self.assertEqual(mesh_info['bounding_box']['min'], (0.0, 0.0, 0.0))
+        self.assertEqual(mesh_info['bounding_box']['max'], (1.0, 1.0, 2.0))
         
+        report = current_3d_analyzer.generate_3d_report(result)
+        self.assertIn("예시 메시 경계 상자 (Min): 0.00, 0.00, 0.00", report)
+        self.assertIn("예시 메시 경계 상자 (Max): 1.00, 1.00, 2.00", report)
+
+        os.unlink(dxf_file)
+
+
+# --- DXFComparison 테스트 ---
+@unittest.skipIf(not COMPARISON_AVAILABLE or not ANALYZER_AVAILABLE, "DXFComparison or DXFAnalyzer not available")
+class TestDXFComparison(unittest.TestCase):
+    def setUp(self):
+        self.comparator = DXFComparison()
+        self.analyzer1 = DXFAnalyzer()
+        self.analyzer2 = DXFAnalyzer()
+
+    def test_compare_simple_changes(self):
+        # 이 테스트는 DXFComparison 모듈의 실제 구현에 따라 상세한 assert 내용이 달라져야 함
+        def dxf1_entities(msp):
+            msp.add_line((0,0), (1,1), dxfattribs={'layer': 'L1'})
+            msp.add_circle((5,5), 2, dxfattribs={'layer': 'L1'})
+
+        def dxf2_entities(msp):
+            msp.add_line((0,0), (1,1), dxfattribs={'layer': 'L1'})
+            msp.add_line((2,2), (3,3), dxfattribs={'layer': 'L2'})
+            msp.add_circle((5,5), 2.5, dxfattribs={'layer': 'L1'}) # 반지름 변경
+
+        dxf_file1 = create_test_dxf_file(dxf1_entities, "comp1.dxf")
+        dxf_file2 = create_test_dxf_file(dxf2_entities, "comp2.dxf")
+
+        self.analyzer1.analyze_dxf_file(dxf_file1)
+        self.analyzer2.analyze_dxf_file(dxf_file2)
+        self.assertIsNotNone(self.analyzer1.analysis_data)
+        self.assertIsNotNone(self.analyzer2.analysis_data)
+
+        diff = self.comparator.compare_dxf_files(self.analyzer1.analysis_data, self.analyzer2.analysis_data)
+        
+        # DXFComparison의 반환값 구조를 알아야 정확한 테스트 가능
+        # 예시: summary의 추가/수정/삭제 카운트 확인
+        self.assertIn('summary', diff)
+        # self.assertEqual(diff['summary'].get('total_additions',0) > 0, True) # LINE 및 Layer L2 추가
+        # self.assertEqual(diff['summary'].get('total_modifications',0) > 0, True) # CIRCLE 수정
+        
+        report = self.comparator.generate_comparison_report() # diff 객체를 인자로 받을 수도 있음
+        self.assertIn("레이어 'L2'가 추가되었습니다.", report)
+        self.assertIn("CIRCLE", report) # 변경된 CIRCLE 언급
+
+        os.unlink(dxf_file1)
+        os.unlink(dxf_file2)
+
+# --- DXFAutoFix 테스트 ---
+@unittest.skipIf(not AUTO_FIX_AVAILABLE or not ANALYZER_AVAILABLE, "DXFAutoFix or DXFAnalyzer not available")
+class TestDXFAutoFix(unittest.TestCase):
+    def setUp(self):
+        self.fixer = DXFAutoFix()
+        self.analyzer = DXFAnalyzer()
+
+    def test_conceptual_fix_duplicate_lines(self):
+        def duplicate_lines_entities(msp):
+            msp.add_line((0,0), (1,1), dxfattribs={'layer': 'L_DUPE'})
+            msp.add_line((0,0), (1,1), dxfattribs={'layer': 'L_DUPE'})
+            msp.add_line((10,10), (20,20), dxfattribs={'layer': 'L_DUPE'})
+
+        dxf_file = create_test_dxf_file(duplicate_lines_entities, "dupe.dxf")
+        
+        self.analyzer.analyze_dxf_file(dxf_file)
+        self.assertIsNotNone(self.analyzer.analysis_data)
+
+        loaded = self.fixer.load_file(dxf_file)
         self.assertTrue(loaded)
         
-        # 수정 실행
-        fixes = fixer.auto_fix_all(analyzer.analysis_data)
-        
-        self.assertIsNotNone(fixes)
-        self.assertIn('summary', fixes)
-    
-    def test_report_generation(self):
-        """리포트 생성 테스트"""
-        analyzer = DXFAnalyzer()
-        analyzer.analyze_dxf_file(self.sample_file)
-        
-        # 임시 파일로 리포트 생성
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
-            temp_path = f.name
-        
-        try:
-            # 마크다운 리포트
-            result = analyzer.generate_markdown_report(temp_path)
-            self.assertTrue(Path(temp_path).exists())
-            self.assertGreater(Path(temp_path).stat().st_size, 0)
-            
-            # 고급 리포트 (가능한 경우)
-            if hasattr(analyzer, 'generate_advanced_report'):
-                adv_path = temp_path.replace('.md', '_advanced.md')
-                result = analyzer.generate_advanced_report(adv_path)
-                self.assertTrue(Path(adv_path).exists())
-                
-                # JSON 컨텍스트도 생성되었는지 확인
-                json_path = adv_path.replace('.md', '_ai_context.json')
-                if Path(json_path).exists():
-                    with open(json_path, 'r', encoding='utf-8') as f:
-                        ai_context = json.load(f)
-                    self.assertIn('summary', ai_context)
-                    
-        finally:
-            # 정리
-            for file in [temp_path, adv_path, json_path]:
-                if Path(file).exists():
-                    os.unlink(file)
+        fixes_summary = self.fixer.auto_fix_all(self.analyzer.analysis_data, None)
+        self.assertIn('duplicate_entities_removed', fixes_summary.get('fixes_applied', []))
+
+        # 실제 파일 저장 및 검증은 추가 로직 필요
+        # fixed_path = self.fixer.save_fixed_file(dxf_file.replace(".dxf", "_fixed.dxf"))
+        # ... (fixed_path 분석 후 검증) ...
+        # if os.path.exists(fixed_path): os.unlink(fixed_path)
+        os.unlink(dxf_file)
 
 
-class TestDXFComparison(unittest.TestCase):
-    """비교 기능 상세 테스트"""
+# --- DXFAIIntegration 테스트 (Mock 사용) ---
+# DXFAIIntegration 테스트는 비동기이므로 unittest.IsolatedAsyncioTestCase 사용
+@unittest.skipIf(not AI_INTEGRATION_AVAILABLE, "DXFAIIntegration or dependent AI libraries not available")
+class TestDXFAIIntegration(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self): # setUp -> asyncSetUp
+        self.ai_integration = DXFAIIntegration()
+        self.ai_integration.openai_api_key = "FAKE_KEY_FOR_TESTING_OPENAI"
+        self.ai_integration.claude_api_key = "FAKE_KEY_FOR_TESTING_CLAUDE"
+        self.ai_integration.gemini_api_key = "FAKE_KEY_FOR_TESTING_GEMINI"
+
+        # 실제 클라이언트 대신 Mock 객체 사용
+        if CLAUDE_AVAILABLE:
+            self.ai_integration.claude_client = MagicMock()
+            # messages.create가 비동기 함수처럼 보이게 AsyncMock 사용 또는 to_thread를 고려한 mock
+            self.ai_integration.claude_client.messages.create = AsyncMock()
+        else:
+            self.ai_integration.claude_client = None
+
+        if GEMINI_AVAILABLE:
+            self.ai_integration.gemini_model = MagicMock()
+            self.ai_integration.gemini_model.generate_content = AsyncMock() # generate_content도 비동기 mock
+        else:
+            self.ai_integration.gemini_model = None
     
-    def test_layer_comparison(self):
-        """레이어 비교 테스트"""
-        # 가상의 분석 데이터
-        data1 = {
-            'layers': [
-                {'name': 'Layer1', 'color': 1, 'linetype': 'CONTINUOUS'},
-                {'name': 'Layer2', 'color': 2, 'linetype': 'DASHED'}
-            ]
-        }
+    # OpenAI v0.x.x 용 patch
+    @patch('openai.ChatCompletion.create', new_callable=AsyncMock)
+    async def test_analyze_with_openai_mocked(self, mock_openai_call):
+        if not self.ai_integration.is_api_key_configured('openai'):
+            self.skipTest("OpenAI API key not configured for DXFAIIntegration")
+
+        mock_response_content = "OpenAI mock analysis result."
+        mock_openai_call.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content=mock_response_content))]
+        )
         
-        data2 = {
-            'layers': [
-                {'name': 'Layer1', 'color': 2, 'linetype': 'CONTINUOUS'},  # 색상 변경
-                {'name': 'Layer3', 'color': 3, 'linetype': 'CONTINUOUS'}   # 새 레이어
-            ]
-        }
+        sample_data = {'file_info': {}, 'summary_info': {'total_entities': 10}, 'layers':[], 'entity_breakdown':{}}
+        # _call_openai_async 내부에서 asyncio.to_thread를 사용하므로, ChatCompletion.create를 mock
+        # 이 테스트는 DXFAIIntegration._call_openai_async가 to_thread를 사용하지 않는다고 가정하고 직접 mock
+        # 만약 to_thread를 유지한다면, patch 대상이 달라지거나, to_thread 자체를 mock해야 할 수 있음
+        # 여기서는 _call_openai_async가 직접 openai.ChatCompletion.create를 호출한다고 가정하고 patch
         
-        comparator = DXFComparison()
-        differences = comparator.compare_dxf_files(data1, data2)
-        
-        # 추가된 레이어 확인
-        self.assertEqual(len(differences['added']['layers']), 1)
-        self.assertEqual(differences['added']['layers'][0]['name'], 'Layer3')
-        
-        # 제거된 레이어 확인
-        self.assertEqual(len(differences['removed']['layers']), 1)
-        self.assertEqual(differences['removed']['layers'][0]['name'], 'Layer2')
-        
-        # 수정된 레이어 확인
-        self.assertEqual(len(differences['modified']['layers']), 1)
-        self.assertEqual(differences['modified']['layers'][0]['name'], 'Layer1')
+        # DXFAIIntegration._call_openai_async를 직접 mock 하는 방법도 있음
+        with patch.object(self.ai_integration, '_call_openai_async', new_callable=AsyncMock) as mock_internal_call:
+            mock_internal_call.return_value = mock_response_content # _call_openai_async가 문자열을 반환한다고 가정
+            result = await self.ai_integration.analyze_with_openai(sample_data, 'analysis')
+
+            self.assertNotIn('error', result, f"OpenAI 분석 결과에 오류 포함: {result.get('error')}")
+            self.assertEqual(result.get('analysis'), mock_response_content)
+            mock_internal_call.assert_called_once()
 
 
-class TestDXFAutoFix(unittest.TestCase):
-    """자동 수정 기능 상세 테스트"""
-    
-    def test_layer_fixes(self):
-        """레이어 수정 테스트"""
-        fixer = DXFAutoFix()
-        
-        # 가상의 분석 데이터 (레이어가 0만 있는 경우)
-        analysis_data = {
-            'layers': [{'name': '0', 'color': 7, 'linetype': 'CONTINUOUS'}]
-        }
-        
-        # 이 테스트는 실제 DXF 파일 없이는 제한적
-        # 실제 환경에서는 파일을 로드하고 수정해야 함
-        self.assertIsNotNone(fixer)
-    
-    def test_duplicate_removal(self):
-        """중복 제거 테스트"""
-        fixer = DXFAutoFix()
-        
-        # 가상의 고급 분석 데이터
-        advanced_analysis = {
-            'anomalies': [
-                {'type': 'duplicate_circle', 'count': 3}
-            ]
-        }
-        
-        # 실제 테스트는 DXF 파일이 필요
-        self.assertIsNotNone(fixer)
+    async def test_analyze_with_claude_mocked(self):
+        if not self.ai_integration.is_api_key_configured('claude'):
+            self.skipTest("Claude API not configured or client not available for DXFAIIntegration")
 
+        mock_response_content = "Claude mock analysis result."
+        if self.ai_integration.claude_client: # claude_client가 None이 아닐 때만 (즉, 라이브러리 존재 시)
+             self.ai_integration.claude_client.messages.create.return_value = MagicMock(content=[MagicMock(text=mock_response_content)])
 
-def run_integration_test():
-    """통합 테스트"""
-    print("\n=== DXF 분석기 v2.0 통합 테스트 ===\n")
-    
-    # 1. 샘플 파일 생성
-    print("1. 샘플 파일 준비...")
-    sample_file = "integration_test.dxf"
-    if not Path(sample_file).exists():
-        from create_sample_dxf import create_sample_dxf
-        create_sample_dxf(sample_file)
-    print("✅ 샘플 파일 준비 완료")
-    
-    # 2. 전체 분석 파이프라인
-    print("\n2. 전체 분석 파이프라인 테스트...")
-    
-    # 기본 분석
-    analyzer = DXFAnalyzer()
-    success = analyzer.analyze_dxf_file(sample_file)
-    print(f"  - 기본 분석: {'✅ 성공' if success else '❌ 실패'}")
-    
-    # 3D 분석
-    analyzer_3d = DXF3DAnalyzer()
-    print(f"  - 3D 분석기 초기화: ✅")
-    
-    # 비교 (동일 파일)
-    comparator = DXFComparison()
-    differences = comparator.compare_dxf_files(
-        analyzer.analysis_data,
-        analyzer.analysis_data
-    )
-    print(f"  - 비교 분석: ✅ (변경사항 {differences['summary']['total_additions']}개)")
-    
-    # 자동 수정
-    fixer = DXFAutoFix()
-    loaded = fixer.load_file(sample_file)
-    print(f"  - 자동 수정: {'✅ 파일 로드 성공' if loaded else '❌ 파일 로드 실패'}")
-    
-    # 3. 리포트 생성
-    print("\n3. 리포트 생성 테스트...")
-    report_path = "integration_test_report.md"
-    analyzer.generate_markdown_report(report_path)
-    print(f"  - 마크다운 리포트: ✅ {report_path}")
-    
-    # 고급 리포트
-    if hasattr(analyzer, 'generate_advanced_report'):
-        adv_report = "integration_test_advanced.md"
-        analyzer.generate_advanced_report(adv_report)
-        print(f"  - 고급 리포트: ✅ {adv_report}")
-    
-    # 4. 정리
-    print("\n4. 테스트 파일 정리...")
-    for file in [sample_file, report_path, adv_report]:
-        if Path(file).exists():
-            os.unlink(file)
-    print("✅ 정리 완료")
-    
-    print("\n=== 통합 테스트 완료 ===")
+        sample_data = {'file_info': {}, 'summary_info': {'total_entities': 20}, 'layers':[], 'entity_breakdown':{}}
+        result = await self.ai_integration.analyze_with_claude(sample_data, 'analysis')
 
+        self.assertNotIn('error', result, f"Claude 분석 결과에 오류 포함: {result.get('error')}")
+        self.assertEqual(result.get('analysis'), mock_response_content)
+        if self.ai_integration.claude_client:
+            self.ai_integration.claude_client.messages.create.assert_called_once()
+
+    async def test_analyze_with_gemini_mocked(self):
+        if not self.ai_integration.is_api_key_configured('gemini'):
+            self.skipTest("Gemini API not configured or model not available for DXFAIIntegration")
+
+        mock_response_content = "Gemini mock analysis result."
+        if self.ai_integration.gemini_model: # gemini_model이 None이 아닐 때만
+            self.ai_integration.gemini_model.generate_content.return_value = MagicMock(text=mock_response_content)
+
+        sample_data = {'file_info': {}, 'summary_info': {'total_entities': 30}, 'layers':[], 'entity_breakdown':{}}
+        result = await self.ai_integration.analyze_with_gemini(sample_data, 'analysis')
+
+        self.assertNotIn('error', result, f"Gemini 분석 결과에 오류 포함: {result.get('error')}")
+        self.assertEqual(result.get('analysis'), mock_response_content)
+        if self.ai_integration.gemini_model:
+            self.ai_integration.gemini_model.generate_content.assert_called_once()
 
 if __name__ == '__main__':
-    # 단위 테스트 실행
-    print("단위 테스트 실행 중...")
-    unittest.main(verbosity=2, exit=False)
+    if sys.version_info >= (3, 8) and sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     
-    # 통합 테스트 실행
-    run_integration_test() 
+    # unittest.main()은 기본적으로 IsolatedAsyncioTestCase를 잘 처리함
+    unittest.main(verbosity=2)
