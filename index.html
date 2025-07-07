@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DXF CAD 도면 분석기 - 상용화 가능한 Python 솔루션</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="flex items-center justify-between">
+                <div class="logo">
+                    <h1>🔧 DXF CAD 도면 분석기</h1>
+                    <span class="version">v1.0.0</span>
+                </div>
+                <nav class="nav">
+                    <a href="#features" class="nav-link">기능</a>
+                    <a href="#demo" class="nav-link">데모</a>
+                    <a href="#download" class="nav-link">다운로드</a>
+                    <a href="#tech" class="nav-link">기술 정보</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <h2>AutoCAD DXF 파일을 상세하게 분석하는 상용화 가능한 Python 솔루션</h2>
+                <p>ezdxf 라이브러리 기반으로 구축된 강력한 DXF 분석 도구로, GUI, 웹, CLI 인터페이스를 모두 지원합니다.</p>
+                <div class="hero-actions">
+                    <button class="btn btn--primary btn--lg" onclick="simulateFileUpload()">데모 파일 업로드</button>
+                    <a href="#download" class="btn btn--outline btn--lg">다운로드</a>
+                </div>
+            </div>
+            <div class="hero-demo">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-content">
+                        <div class="upload-icon">📁</div>
+                        <h3>DXF 파일을 드래그하거나 클릭하여 업로드</h3>
+                        <p>지원 형식: .dxf, .dwg</p>
+                        <input type="file" id="fileInput" accept=".dxf,.dwg" style="display: none;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="features">
+        <div class="container">
+            <h2>주요 기능</h2>
+            <div class="features-grid">
+                <div class="feature-card card">
+                    <div class="card__body">
+                        <div class="feature-icon">🔧</div>
+                        <h3>자동 DXF 파싱</h3>
+                        <p>ezdxf 라이브러리 기반의 강력한 DXF 파일 분석</p>
+                    </div>
+                </div>
+                <div class="feature-card card">
+                    <div class="card__body">
+                        <div class="feature-icon">📊</div>
+                        <h3>상세 객체 분석</h3>
+                        <p>치수, 원/호, 텍스트, 라인 등 모든 CAD 객체 자동 인식</p>
+                    </div>
+                </div>
+                <div class="feature-card card">
+                    <div class="card__body">
+                        <div class="feature-icon">🎨</div>
+                        <h3>레이어 정보 추출</h3>
+                        <p>색상, 라인타입, 상태 등 레이어 속성 분석</p>
+                    </div>
+                </div>
+                <div class="feature-card card">
+                    <div class="card__body">
+                        <div class="feature-icon">📈</div>
+                        <h3>통계 정보 제공</h3>
+                        <p>객체 유형별 개수 및 분포 통계</p>
+                    </div>
+                </div>
+                <div class="feature-card card">
+                    <div class="card__body">
+                        <div class="feature-icon">📝</div>
+                        <h3>마크다운 리포트</h3>
+                        <p>전문적인 분석 리포트 자동 생성</p>
+                    </div>
+                </div>
+                <div class="feature-card card">
+                    <div class="card__body">
+                        <div class="feature-icon">🖥️</div>
+                        <h3>다중 인터페이스</h3>
+                        <p>GUI, 웹, CLI 버전 지원</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Demo Section -->
+    <section id="demo" class="demo">
+        <div class="container">
+            <h2>버전별 기능 데모</h2>
+            <div class="demo-tabs">
+                <button class="tab-btn active" onclick="showTab('gui')">GUI 버전</button>
+                <button class="tab-btn" onclick="showTab('web')">웹 버전</button>
+                <button class="tab-btn" onclick="showTab('cli')">CLI 버전</button>
+            </div>
+            
+            <div id="gui-tab" class="tab-content active">
+                <div class="version-info">
+                    <h3>GUI 버전</h3>
+                    <p>tkinter 기반의 데스크톱 애플리케이션</p>
+                    <div class="command-line">
+                        <code>python dxf_analyzer.py --gui</code>
+                    </div>
+                    <ul class="feature-list">
+                        <li>직관적인 사용자 인터페이스</li>
+                        <li>실시간 분석 진행률 표시</li>
+                        <li>탭별 결과 확인</li>
+                        <li>마크다운 리포트 내보내기</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div id="web-tab" class="tab-content">
+                <div class="version-info">
+                    <h3>웹 버전</h3>
+                    <p>Streamlit 기반의 웹 애플리케이션</p>
+                    <div class="command-line">
+                        <code>python dxf_analyzer.py --web</code>
+                    </div>
+                    <ul class="feature-list">
+                        <li>웹 브라우저에서 실행</li>
+                        <li>드래그 앤 드롭 파일 업로드</li>
+                        <li>인터랙티브 차트</li>
+                        <li>실시간 다운로드</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div id="cli-tab" class="tab-content">
+                <div class="version-info">
+                    <h3>CLI 버전</h3>
+                    <p>명령줄 인터페이스로 배치 처리 지원</p>
+                    <div class="command-line">
+                        <code>python dxf_analyzer.py --cli file.dxf</code>
+                    </div>
+                    <ul class="feature-list">
+                        <li>스크립트 자동화</li>
+                        <li>배치 처리</li>
+                        <li>서버 환경 최적화</li>
+                        <li>로그 파일 생성</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Analysis Results Section -->
+    <section class="analysis-results">
+        <div class="container">
+            <h2>분석 결과 샘플</h2>
+            <div class="results-grid">
+                <div class="result-card card">
+                    <div class="card__body">
+                        <h3>파일 정보</h3>
+                        <div class="stat-item">
+                            <span class="stat-label">파일명:</span>
+                            <span class="stat-value">sample_drawing.dxf</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">파일 크기:</span>
+                            <span class="stat-value">2.5 MB</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">전체 엔티티:</span>
+                            <span class="stat-value">1,234개</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">레이어 수:</span>
+                            <span class="stat-value">15개</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="result-card card">
+                    <div class="card__body">
+                        <h3>객체 분포</h3>
+                        <canvas id="entityChart" style="max-height: 300px;"></canvas>
+                    </div>
+                </div>
+                
+                <div class="result-card card">
+                    <div class="card__body">
+                        <h3>마크다운 리포트 미리보기</h3>
+                        <div class="markdown-preview">
+                            <pre><code># DXF 분석 리포트
+
+## 파일 정보
+- 파일명: sample_drawing.dxf
+- 크기: 2.5 MB
+- 분석 일시: 2025-06-30 15:37:00
+
+## 엔티티 통계
+- 총 엔티티 수: 1,234개
+- LINE: 456개 (37.0%)
+- TEXT: 156개 (12.6%)
+- POLYLINE: 89개 (7.2%)
+
+## 레이어 정보
+- 총 레이어 수: 15개
+- 활성 레이어: 12개
+- 비활성 레이어: 3개</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Download Section -->
+    <section id="download" class="download">
+        <div class="container">
+            <h2>다운로드</h2>
+            <div class="download-grid">
+                <div class="download-card card">
+                    <div class="card__body">
+                        <div class="download-icon">📦</div>
+                        <h3>소스 코드</h3>
+                        <p>GitHub에서 전체 소스 코드를 확인하고 다운로드하세요</p>
+                        <a href="https://github.com/example/dxf-analyzer" target="_blank" class="btn btn--primary btn--full-width">GitHub에서 보기</a>
+                    </div>
+                </div>
+                
+                <div class="download-card card">
+                    <div class="card__body">
+                        <div class="download-icon">🚀</div>
+                        <h3>실행 파일</h3>
+                        <p>컴파일된 실행 파일을 다운로드하여 바로 사용하세요</p>
+                        <button class="btn btn--primary btn--full-width" onclick="simulateDownload('executable')">Windows 실행파일</button>
+                    </div>
+                </div>
+                
+                <div class="download-card card">
+                    <div class="card__body">
+                        <div class="download-icon">📚</div>
+                        <h3>설치 가이드</h3>
+                        <p>상세한 설치 및 사용 방법을 확인하세요</p>
+                        <button class="btn btn--outline btn--full-width" onclick="showInstallGuide()">설치 가이드 보기</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tech Stack Section -->
+    <section id="tech" class="tech-stack">
+        <div class="container">
+            <h2>기술 정보</h2>
+            <div class="tech-grid">
+                <div class="tech-category">
+                    <h3>프로그래밍 언어</h3>
+                    <div class="tech-item">
+                        <span class="tech-name">Python 3.8+</span>
+                        <span class="tech-desc">핵심 프로그래밍 언어</span>
+                    </div>
+                </div>
+                
+                <div class="tech-category">
+                    <h3>주요 라이브러리</h3>
+                    <div class="tech-item">
+                        <span class="tech-name">ezdxf</span>
+                        <span class="tech-desc">DXF 파일 파싱 라이브러리</span>
+                    </div>
+                    <div class="tech-item">
+                        <span class="tech-name">pandas</span>
+                        <span class="tech-desc">데이터 처리</span>
+                    </div>
+                </div>
+                
+                <div class="tech-category">
+                    <h3>프레임워크</h3>
+                    <div class="tech-item">
+                        <span class="tech-name">tkinter</span>
+                        <span class="tech-desc">GUI 프레임워크</span>
+                    </div>
+                    <div class="tech-item">
+                        <span class="tech-name">Streamlit</span>
+                        <span class="tech-desc">웹 애플리케이션 프레임워크</span>
+                    </div>
+                </div>
+                
+                <div class="tech-category">
+                    <h3>배포 도구</h3>
+                    <div class="tech-item">
+                        <span class="tech-name">PyInstaller</span>
+                        <span class="tech-desc">실행 파일 생성</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="system-requirements">
+                <h3>시스템 요구사항</h3>
+                <ul>
+                    <li>Python 3.8 이상</li>
+                    <li>Windows 10/11, macOS 10.15+, Linux Ubuntu 18.04+</li>
+                    <li>최소 512MB RAM</li>
+                    <li>50MB 디스크 공간</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- Use Cases Section -->
+    <section class="use-cases">
+        <div class="container">
+            <h2>활용 분야</h2>
+            <div class="use-cases-grid">
+                <div class="use-case-card card">
+                    <div class="card__body">
+                        <div class="use-case-icon">🏭</div>
+                        <h3>제조업체</h3>
+                        <p>도면 검토 및 품질 관리, 설계 변경사항 추적, 제조 사양 추출</p>
+                    </div>
+                </div>
+                <div class="use-case-card card">
+                    <div class="card__body">
+                        <div class="use-case-icon">🔬</div>
+                        <h3>엔지니어링 회사</h3>
+                        <p>프로젝트 도면 분석, 설계 표준 준수 확인, 클라이언트 리포트 생성</p>
+                    </div>
+                </div>
+                <div class="use-case-card card">
+                    <div class="card__body">
+                        <div class="use-case-icon">🎓</div>
+                        <h3>교육 기관</h3>
+                        <p>CAD 교육 자료 생성, 학생 과제 평가, 설계 프로세스 교육</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>DXF CAD 도면 분석기</h3>
+                    <p>상용화 가능한 Python 기반 DXF 분석 솔루션</p>
+                    <div class="license">
+                        <span class="status status--success">MIT License</span>
+                    </div>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>지원</h4>
+                    <ul class="footer-links">
+                        <li><a href="https://github.com/example/dxf-analyzer" target="_blank">GitHub</a></li>
+                        <li><a href="https://github.com/example/dxf-analyzer/issues" target="_blank">이슈 리포트</a></li>
+                        <li><a href="#" onclick="showUserManual()">사용자 매뉴얼</a></li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>플랫폼</h4>
+                    <ul class="footer-links">
+                        <li>Windows</li>
+                        <li>macOS</li>
+                        <li>Linux</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <p>&copy; 2025 DXF CAD 도면 분석기. MIT License.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Modal -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

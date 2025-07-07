@@ -1,0 +1,54 @@
+# DXF CAD 도면 분석기 - 필수 라이브러리
+
+# 핵심 DXF 처리 라이브러리
+ezdxf>=1.0.0
+
+# GUI 라이브러리 (기본 내장)
+# tkinter  # Python 기본 내장 - pip 설치 불필요
+
+# 웹 애플리케이션 (선택사항)
+streamlit>=1.28.0
+pandas>=2.0.0
+
+# 추가 유틸리티
+python-dateutil>=2.8.0
+numpy>=1.24.0
+
+# API 서버 (v2.0 신규)
+fastapi>=0.104.0
+uvicorn>=0.24.0
+aiofiles>=23.0.0
+pyjwt>=2.8.0
+python-multipart>=0.0.6
+pydantic>=2.0.0
+httpx>=0.24.0
+
+# AI 통합 (선택사항, v2.0 신규)
+openai>=1.0.0
+anthropic>=0.5.0
+google-generativeai>=0.3.0
+
+# 파일 비교 및 분석 (v2.0 신규)
+# difflib  # Python 기본 내장
+
+# 패키징 및 배포 (개발용)
+pyinstaller>=5.0.0
+setuptools>=68.0.0
+wheel>=0.41.0
+
+# 개발 도구 (선택사항)
+pytest>=7.0.0
+black>=22.0.0
+flake8>=5.0.0
+
+# 비동기 처리 (v2.0 신규)
+aiohttp>=3.9.0
+# asyncio  # Python 기본 내장
+
+# 데이터 시각화 (v2.0 신규)
+plotly>=5.17.0
+matplotlib>=3.7.0
+
+# IoT 모니터링 (v2.1 신규)
+paho-mqtt>=1.6.0
+websockets>=10.0

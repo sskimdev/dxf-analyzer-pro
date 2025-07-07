@@ -1,0 +1,44 @@
+{
+  "summary": {
+    "file_name": "sample_drawing.dxf",
+    "total_entities": 17,
+    "quality_score": 100.0,
+    "quality_grade": "A (우수)",
+    "complexity_level": "매우 단순",
+    "standards_compliant": true
+  },
+  "quality_analysis": {
+    "score": 100.0,
+    "issues": [],
+    "recommendations": []
+  },
+  "complexity_analysis": {
+    "overall_complexity": 0.09285,
+    "entity_complexity": 0.0017,
+    "layer_complexity": 0.14,
+    "type_complexity": 0.25,
+    "complexity_level": "매우 단순"
+  },
+  "standards_compliance": {
+    "standard": "ISO",
+    "compliance_score": 100,
+    "violations": [],
+    "compliant": true
+  },
+  "anomalies": [],
+  "patterns": {
+    "repeated_dimensions": {
+      "found": false
+    },
+    "grid_pattern": {
+      "found": false
+    },
+    "symmetry": {
+      "found": false
+    }
+  },
+  "key_insights": [
+    "도면 품질이 우수한 수준입니다."
+  ],
+  "improvement_suggestions": []
+}
