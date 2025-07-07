@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 import ezdxf
 from ezdxf.addons import Importer
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -373,6 +373,30 @@ class DXF3DViewer:
                 raise HTTPException(status_code=400, detail=result['error'])
             
             return JSONResponse(content=result)
+        
+        @self.app.post("/api/convert-file")
+        async def convert_dxf_file(
+            file: UploadFile = File(...),
+            extrusion_height: float = Form(10.0)
+        ):
+            """(업로드) DXF 파일을 3D 데이터로 변환"""
+            temp_path = f"temp_{file.filename}"
+            try:
+                # 업로드 파일 저장
+                with open(temp_path, "wb") as tmp:
+                    tmp.write(await file.read())
+
+                # 변환 수행
+                result = self.converter.convert_dxf_to_3d(temp_path, extrusion_height)
+            finally:
+                # 임시 파일 정리
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+
+            if 'error' in result:
+                raise HTTPException(status_code=400, detail=result['error'])
+
+            return JSONResponse(content=result)
     
     def get_viewer_html(self) -> str:
         """3D 뷰어 HTML"""
@@ -459,6 +483,7 @@ class DXF3DViewer:
         let wireframeMode = false;
         let axesHelper = null;
         let currentDXFData = null;
+        let extrusionHeight = 10;
 
         // Three.js 초기화
         function init() {
@@ -526,9 +551,29 @@ class DXF3DViewer:
                 return;
             }
             
-            // 실제 구현에서는 파일을 서버로 업로드하고 변환
-            // 여기서는 데모를 위한 간단한 구현
-            alert('파일 로드 기능은 서버 연동이 필요합니다');
+            // 서버로 파일 업로드 후 3D 데이터 요청
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('extrusion_height', extrusionHeight);
+
+            try {
+                const response = await fetch('/api/convert-file', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    alert('변환 실패: ' + (error.detail || response.statusText));
+                    return;
+                }
+
+                const data = await response.json();
+                createGeometryFromData(data);
+            } catch (err) {
+                console.error(err);
+                alert('파일 업로드 중 오류가 발생했습니다');
+            }
         }
         
         function createGeometryFromData(data) {
@@ -602,7 +647,7 @@ class DXF3DViewer:
         
         function updateHeight(value) {
             document.getElementById('heightValue').textContent = value;
-            // 서버에 새 높이로 재변환 요청
+            extrusionHeight = value;
         }
         
         function resetView() {
