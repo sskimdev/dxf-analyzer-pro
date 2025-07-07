@@ -16,9 +16,14 @@ AutoCAD DXF 파일을 분석하여 상세한 마크다운 리포트를 생성하
 - **마크다운 리포트 생성**: 전문적인 분석 리포트 자동 생성
 
 ### 🖥️ 사용자 인터페이스
-- **GUI 버전**: tkinter 기반의 데스크톱 애플리케이션
-- **웹 버전**: Streamlit 기반의 웹 애플리케이션
-- **CLI 버전**: 명령줄 인터페이스로 배치 처리 지원
+- **GUI 버전**: tkinter 기반의 데스크톱 애플리케이션 (`dxf_analyzer_gui.py`)
+- **웹 버전**: Streamlit 기반의 웹 애플리케이션 (`dxf_analyzer_webapp.py`)
+- **CLI 버전**: 명령줄 인터페이스로 배치 처리 지원 (`dxf_analyzer.py`)
+- **Cloud API**: FastAPI 기반의 REST API 제공 (`dxf_cloud_api.py`)
+    - DXF 파일 업로드 및 분석 요청 (기본, 고급, 3D 분석 옵션 제공)
+    - JWT 기반 인증 (선택적)
+    - 비동기 작업 처리 및 상태 조회
+    - 자동 생성되는 API 문서 (Swagger UI, ReDoc) 접근 가능 (기본: `http://localhost:8000/docs`)
 
 ### 📊 지원 형식
 - AutoCAD DXF (Drawing Exchange Format)
@@ -113,6 +118,15 @@ make lint           # 코드 린팅
 make format         # 코드 포맷팅
 make build          # 패키지 빌드
 make build-exe      # 실행 파일 생성
+
+### 테스트 실행
+```bash
+# 모든 테스트 실행 (test_*.py 패턴)
+python -m unittest discover
+
+# 특정 테스트 파일 실행
+python test_dxf_analyzer.py
+python test_v2_features.py
 ```
 
 ## 📁 프로젝트 구조

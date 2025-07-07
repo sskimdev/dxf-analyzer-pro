@@ -149,10 +149,24 @@ class DXF3DAnalyzer:
                 'is_closed': getattr(entity.dxf, 'is_closed', False)
             }
             
-            # Z 범위 업데이트
-            for vertex in vertices:
-                if len(vertex) >= 3:
-                    self._update_z_range(vertex[2])
+            # Z 범위 및 경계 상자 업데이트
+            min_coord = [float('inf')] * 3
+            max_coord = [float('-inf')] * 3
+
+            for vertex_coords in vertices: # ezdxf의 Mesh.vertices는 점의 리스트를 반환
+                point = list(vertex_coords) # 튜플을 리스트로 변환하여 수정 가능하게
+                while len(point) < 3: # 2D 좌표인 경우 Z=0 추가
+                    point.append(0.0)
+
+                self._update_z_range(point[2])
+                for i in range(3):
+                    min_coord[i] = min(min_coord[i], point[i])
+                    max_coord[i] = max(max_coord[i], point[i])
+
+            mesh_info['bounding_box'] = {
+                'min': tuple(min_coord) if min_coord[0] != float('inf') else None,
+                'max': tuple(max_coord) if max_coord[0] != float('-inf') else None
+            }
             
             self.meshes.append(mesh_info)
             
@@ -387,8 +401,14 @@ class DXF3DAnalyzer:
             report += f"- 서피스: {analysis_result['surfaces']['count']}개\n"
             
         if analysis_result.get('meshes', {}).get('count', 0) > 0:
-            meshes = analysis_result['meshes']
-            report += f"- 메시: {meshes['count']}개 (정점: {meshes['total_vertices']:,}, 면: {meshes['total_faces']:,})\n"
+            meshes_analysis = analysis_result['meshes'] # 변수명 변경
+            report += f"- 메시: {meshes_analysis['count']}개 (정점: {meshes_analysis['total_vertices']:,}, 면: {meshes_analysis['total_faces']:,})\n"
+            # 상세 메시 정보 (예: 첫 번째 메시의 경계 상자)
+            # 실제 사용 시에는 모든 메시 정보를 보여주거나 요약하는 방식 필요
+            if self.meshes and 'bounding_box' in self.meshes[0] and self.meshes[0]['bounding_box']['min']:
+                bbox = self.meshes[0]['bounding_box']
+                report += f"  - 예시 메시 경계 상자 (Min): {bbox['min'][0]:.2f}, {bbox['min'][1]:.2f}, {bbox['min'][2]:.2f}\n"
+                report += f"  - 예시 메시 경계 상자 (Max): {bbox['max'][0]:.2f}, {bbox['max'][1]:.2f}, {bbox['max'][2]:.2f}\n"
         
         # 공간 정보
         report += "\n### 공간 정보\n"

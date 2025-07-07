@@ -1,36 +1,35 @@
 // DXF CAD Analyzer Web Application JavaScript
 
-// Sample data for chart
-const sampleEntityData = {
-    LINE: 456,
-    TEXT: 156,
-    POLYLINE: 89,
-    POINT: 234,
-    INSERT: 67,
-    DIMENSION: 45,
-    CIRCLE: 28,
-    ARC: 34,
-    MTEXT: 23,
-    ELLIPSE: 12
-};
+// Global variable to store current analysis data
+let currentAnalysisData = null;
+let entityChartInstance = null; // To store the chart instance
+
+// API Endpoint
+const API_ANALYZE_ENDPOINT = '/api/analyze'; // 실제 API 엔드포인트로 변경해야 합니다.
 
 // Initialize application when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
-    initializeChart();
+    // Initialize chart with no data initially or with a placeholder
+    updateChart(null); // Initialize empty chart
     setupFileUpload();
     setupSmoothScrolling();
 });
 
-// Chart initialization
-function initializeChart() {
+// Chart update function
+function updateChart(analysisData) {
     const ctx = document.getElementById('entityChart');
     if (!ctx) return;
 
-    const labels = Object.keys(sampleEntityData);
-    const data = Object.values(sampleEntityData);
+    const entityBreakdown = analysisData ? analysisData.entityBreakdown : {};
+    const labels = Object.keys(entityBreakdown);
+    const data = Object.values(entityBreakdown);
     const colors = ['#1FB8CD', '#FFC185', '#B4413C', '#ECEBD5', '#5D878F', '#DB4545', '#D2BA4C', '#964325', '#944454', '#13343B'];
 
-    new Chart(ctx, {
+    if (entityChartInstance) {
+        entityChartInstance.destroy(); // Destroy previous chart instance if exists
+    }
+
+    entityChartInstance = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: labels,
@@ -61,9 +60,18 @@ function initializeChart() {
                             const label = context.label || '';
                             const value = context.parsed;
                             const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            if (total === 0) return `${label}: ${value}개 (0%)`; // Avoid division by zero
                             const percentage = ((value / total) * 100).toFixed(1);
                             return `${label}: ${value}개 (${percentage}%)`;
                         }
+                    }
+                },
+                title: {
+                    display: labels.length === 0, // Show title if no data
+                    text: labels.length === 0 ? '데이터 없음' : '',
+                    padding: {
+                        top: 10,
+                        bottom: 10
                     }
                 }
             }
@@ -102,97 +110,149 @@ function setupFileUpload() {
 
     if (!uploadArea || !fileInput) return;
 
-    // Click to upload
-    uploadArea.addEventListener('click', () => {
-        fileInput.click();
+    uploadArea.addEventListener('click', () => fileInput.click());
+
+    ['dragover', 'dragleave', 'drop'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false); // Prevent browser from opening file
     });
 
-    // Drag and drop functionality
-    uploadArea.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        uploadArea.style.borderColor = 'var(--color-primary-hover)';
-        uploadArea.style.backgroundColor = 'var(--color-secondary)';
+    ['dragenter', 'dragover'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, () => {
+            uploadArea.style.borderColor = 'var(--color-primary-hover)';
+            uploadArea.style.backgroundColor = 'var(--color-secondary)';
+        }, false);
     });
 
-    uploadArea.addEventListener('dragleave', (e) => {
-        e.preventDefault();
-        uploadArea.style.borderColor = 'var(--color-primary)';
-        uploadArea.style.backgroundColor = 'var(--color-surface)';
+    ['dragleave', 'drop'].forEach(eventName => {
+        uploadArea.addEventListener(eventName, () => {
+            uploadArea.style.borderColor = 'var(--color-primary)';
+            uploadArea.style.backgroundColor = 'var(--color-surface)';
+        }, false);
     });
 
     uploadArea.addEventListener('drop', (e) => {
-        e.preventDefault();
-        uploadArea.style.borderColor = 'var(--color-primary)';
-        uploadArea.style.backgroundColor = 'var(--color-surface)';
-        
-        const files = e.dataTransfer.files;
+        const dt = e.dataTransfer;
+        const files = dt.files;
         if (files.length > 0) {
             handleFileUpload(files[0]);
         }
-    });
+    }, false);
 
-    // File input change
     fileInput.addEventListener('change', (e) => {
         if (e.target.files.length > 0) {
             handleFileUpload(e.target.files[0]);
         }
     });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
 }
 
-// Handle file upload simulation
-function handleFileUpload(file) {
+// Handle file upload and API call
+async function handleFileUpload(file) {
     const uploadArea = document.getElementById('uploadArea');
     const uploadContent = uploadArea.querySelector('.upload-content');
-    
-    // Check file type
-    const validTypes = ['.dxf', '.dwg'];
+
+    const validTypes = ['.dxf']; // DWG는 현재 백엔드에서 지원 안 될 수 있으므로 DXF만 허용
     const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
-    
+
     if (!validTypes.includes(fileExtension)) {
-        showNotification('지원하지 않는 파일 형식입니다. DXF 또는 DWG 파일을 업로드해주세요.', 'error');
+        showNotification('지원하지 않는 파일 형식입니다. DXF 파일을 업로드해주세요.', 'error');
         return;
     }
 
-    // Start upload simulation
     uploadArea.classList.add('processing');
     uploadContent.innerHTML = `
         <div class="upload-icon">⏳</div>
         <h3>파일 분석 중...</h3>
         <p>${file.name} (${formatFileSize(file.size)})</p>
-        <div class="upload-progress"></div>
+        <div class="upload-progress-bar"><div class="upload-progress"></div></div>
     `;
+    const progressBarFill = uploadContent.querySelector('.upload-progress');
+    progressBarFill.style.width = '0%';
 
-    // Simulate upload progress
-    let progress = 0;
-    const progressBar = uploadArea.querySelector('.upload-progress');
-    const interval = setInterval(() => {
-        progress += Math.random() * 15;
-        if (progress >= 100) {
-            progress = 100;
-            clearInterval(interval);
-            completeUpload(file);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        // Simulate progress for a bit before actual upload for better UX
+        let progress = 0;
+        const progInterval = setInterval(() => {
+            progress += 10;
+            if (progress <= 30) { // Simulate initial progress
+                progressBarFill.style.width = `${progress}%`;
+            } else {
+                clearInterval(progInterval);
+            }
+        }, 100);
+
+
+        const response = await fetch(API_ANALYZE_ENDPOINT, {
+            method: 'POST',
+            body: formData,
+            // Headers (e.g., for authorization) can be added here if needed
+            // headers: { 'Authorization': 'Bearer YOUR_TOKEN' }
+        });
+
+        clearInterval(progInterval); // Clear simulation interval
+        progressBarFill.style.width = '70%'; // Mark as mostly done after server response starts
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ message: '알 수 없는 서버 오류 발생' }));
+            throw new Error(errorData.message || `서버 오류: ${response.status} ${response.statusText}`);
         }
-        progressBar.style.width = `${progress}%`;
-    }, 200);
+
+        const result = await response.json();
+        progressBarFill.style.width = '100%';
+        handleAnalysisResponse(result, file.name);
+
+    } catch (error) {
+        console.error('File upload or analysis error:', error);
+        showNotification(`분석 실패: ${error.message}`, 'error');
+        uploadArea.classList.remove('processing');
+        uploadContent.innerHTML = `
+            <div class="upload-icon">❌</div>
+            <h3>분석 실패</h3>
+            <p>${file.name}</p>
+            <button class="btn btn--outline" onclick="setupFileUpload()">다시 시도</button>
+        `;
+    }
 }
 
-// Complete upload simulation
-function completeUpload(file) {
+// Handle the response from the analysis API
+function handleAnalysisResponse(analysisResult, originalFileName) {
+    currentAnalysisData = analysisResult; // Store the received data globally
+    currentAnalysisData.originalFileName = originalFileName; // Add original file name for display
+
     const uploadArea = document.getElementById('uploadArea');
     const uploadContent = uploadArea.querySelector('.upload-content');
-    
+
+    uploadArea.classList.remove('processing'); // Remove processing class
     uploadContent.innerHTML = `
         <div class="upload-icon">✅</div>
         <h3>분석 완료!</h3>
-        <p>${file.name}</p>
+        <p>${originalFileName}</p>
         <button class="btn btn--primary" onclick="showAnalysisResults()">결과 보기</button>
     `;
 
     showNotification('DXF 파일 분석이 완료되었습니다!', 'success');
+    updateChart(currentAnalysisData); // Update chart with new data
 }
 
-// Show analysis results in modal
+
+// Show analysis results in modal using currentAnalysisData
 function showAnalysisResults() {
+    if (!currentAnalysisData) {
+        showNotification('표시할 분석 데이터가 없습니다.', 'warning');
+        return;
+    }
+
+    const { originalFileName, fileSize, totalEntities, layerCount, entityBreakdown, reportContent } = currentAnalysisData;
+
     const modalBody = document.getElementById('modalBody');
     modalBody.innerHTML = `
         <h2>분석 결과</h2>
@@ -200,30 +260,30 @@ function showAnalysisResults() {
             <h3>파일 정보</h3>
             <div class="stat-item">
                 <span class="stat-label">파일명:</span>
-                <span class="stat-value">sample_drawing.dxf</span>
+                <span class="stat-value">${originalFileName || 'N/A'}</span>
             </div>
             <div class="stat-item">
                 <span class="stat-label">파일 크기:</span>
-                <span class="stat-value">2.5 MB</span>
+                <span class="stat-value">${fileSize ? formatFileSize(fileSize) : 'N/A'}</span>
             </div>
             <div class="stat-item">
                 <span class="stat-label">전체 엔티티:</span>
-                <span class="stat-value">1,234개</span>
+                <span class="stat-value">${totalEntities !== undefined ? totalEntities.toLocaleString() + '개' : 'N/A'}</span>
             </div>
             <div class="stat-item">
                 <span class="stat-label">레이어 수:</span>
-                <span class="stat-value">15개</span>
+                <span class="stat-value">${layerCount !== undefined ? layerCount + '개' : 'N/A'}</span>
             </div>
         </div>
         
         <h3>상세 엔티티 분석</h3>
         <div class="entity-details">
-            ${Object.entries(sampleEntityData).map(([type, count]) => `
+            ${entityBreakdown ? Object.entries(entityBreakdown).map(([type, count]) => `
                 <div class="stat-item">
                     <span class="stat-label">${type}:</span>
-                    <span class="stat-value">${count}개</span>
+                    <span class="stat-value">${count.toLocaleString()}개</span>
                 </div>
-            `).join('')}
+            `).join('') : '<p>엔티티 분석 정보 없음</p>'}
         </div>
         
         <h3>생성된 리포트</h3>
@@ -233,26 +293,8 @@ function showAnalysisResults() {
         </div>
         
         <div class="markdown-preview" style="margin-top: 20px;">
-            <pre><code># DXF 분석 리포트
-
-## 파일 정보
-- 파일명: sample_drawing.dxf
-- 크기: 2.5 MB
-- 분석 일시: ${new Date().toLocaleString('ko-KR')}
-
-## 엔티티 통계
-- 총 엔티티 수: 1,234개
-${Object.entries(sampleEntityData).map(([type, count]) => 
-    `- ${type}: ${count}개 (${((count / 1234) * 100).toFixed(1)}%)`
-).join('\n')}
-
-## 레이어 정보
-- 총 레이어 수: 15개
-- 활성 레이어: 12개
-- 비활성 레이어: 3개
-
-## 분석 완료
-분석이 성공적으로 완료되었습니다.</code></pre>
+            <h4>마크다운 미리보기:</h4>
+            <pre><code>${reportContent || '마크다운 리포트 내용 없음'}</code></pre>
         </div>
     `;
     
@@ -293,23 +335,34 @@ function simulateDownload(type) {
     }, 2000);
 }
 
-// Download report simulation
+// Download report using currentAnalysisData
 function downloadReport(format) {
-    let fileName, message;
-    
+    if (!currentAnalysisData) {
+        showNotification('다운로드할 분석 데이터가 없습니다.', 'warning');
+        return;
+    }
+
+    let fileName, content, mimeType;
+    const baseFileName = currentAnalysisData.originalFileName ? currentAnalysisData.originalFileName.split('.').slice(0, -1).join('.') : 'analysis';
+
     if (format === 'markdown') {
-        fileName = 'dxf_analysis_report.md';
-        message = '마크다운 리포트를 다운로드합니다.';
+        fileName = `${baseFileName}_report.md`;
+        content = currentAnalysisData.reportContent || "# 리포트 내용 없음";
+        mimeType = 'text/markdown';
+        showNotification('마크다운 리포트를 다운로드합니다.', 'info');
+    } else if (format === 'json') {
+        fileName = `${baseFileName}_data.json`;
+        // JSON 데이터는 currentAnalysisData 전체를 사용하거나, 서버가 제공한 특정 JSON 구조를 따를 수 있음
+        // 여기서는 currentAnalysisData 전체를 예시로 사용
+        content = JSON.stringify(currentAnalysisData, null, 2);
+        mimeType = 'application/json';
+        showNotification('JSON 데이터를 다운로드합니다.', 'info');
     } else {
-        fileName = 'dxf_analysis_data.json';
-        message = 'JSON 데이터를 다운로드합니다.';
+        showNotification('알 수 없는 다운로드 형식입니다.', 'error');
+        return;
     }
     
-    showNotification(message, 'info');
-    
-    // Create and download file
-    const content = format === 'markdown' ? generateMarkdownReport() : JSON.stringify(sampleEntityData, null, 2);
-    const blob = new Blob([content], { type: format === 'markdown' ? 'text/markdown' : 'application/json' });
+    const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -322,33 +375,6 @@ function downloadReport(format) {
     setTimeout(() => {
         showNotification(`${fileName} 다운로드가 완료되었습니다.`, 'success');
     }, 1000);
-}
-
-// Generate markdown report
-function generateMarkdownReport() {
-    return `# DXF 분석 리포트
-
-## 파일 정보
-- 파일명: sample_drawing.dxf
-- 크기: 2.5 MB
-- 분석 일시: ${new Date().toLocaleString('ko-KR')}
-
-## 엔티티 통계
-- 총 엔티티 수: 1,234개
-${Object.entries(sampleEntityData).map(([type, count]) => 
-    `- ${type}: ${count}개 (${((count / 1234) * 100).toFixed(1)}%)`
-).join('\n')}
-
-## 레이어 정보
-- 총 레이어 수: 15개
-- 활성 레이어: 12개
-- 비활성 레이어: 3개
-
-## 분석 완료
-분석이 성공적으로 완료되었습니다.
-
----
-Generated by DXF CAD 도면 분석기 v1.0.0`;
 }
 
 // Show install guide

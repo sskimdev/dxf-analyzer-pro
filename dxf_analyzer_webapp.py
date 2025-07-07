@@ -25,7 +25,35 @@ with analysis_options:
     include_dimensions = st.checkbox("치수 정보 포함", value=True)
     include_circles = st.checkbox("원/호 정보 포함", value=True)
     include_texts = st.checkbox("텍스트 정보 포함", value=True)
-    max_display_items = st.slider("최대 표시 항목 수", 10, 100, 50)
+
+    # config.ini에서 기본값 읽기 시도
+    import configparser
+    config = configparser.ConfigParser()
+    config_file = os.path.join(os.path.dirname(__file__), 'config.ini') # config.ini 파일 경로
+
+    default_max_items = 50 # 기본 폴백 값
+    min_slider_val = 10
+    max_slider_val = 200 # 슬라이더 최대값을 좀 더 유연하게 설정
+
+    if os.path.exists(config_file):
+        try:
+            config.read(config_file)
+            default_max_items = config.getint('ANALYSIS', 'max_display_items', fallback=50)
+            # 슬라이더의 최대값을 config 값보다 크게 설정할 수 있도록 조정
+            # 예를 들어 config에 1000이 있어도 슬라이더는 10-200 사이를 유지하고 싶다면 아래처럼
+            # max_slider_val = max(200, default_max_items) # 또는 min(200, default_max_items) 등 정책에 따라
+            # 여기서는 config 값이 슬라이더의 기본값이 되도록 하고, 슬라이더 범위는 고정
+            if default_max_items > max_slider_val: # config 값이 슬라이더 최대보다 크면 슬라이더 최대값으로 제한
+                default_max_items = max_slider_val
+            if default_max_items < min_slider_val: # config 값이 슬라이더 최소보다 작으면 슬라이더 최소값으로 제한
+                default_max_items = min_slider_val
+
+        except (configparser.Error, ValueError) as e:
+            logging.warning(f"config.ini 파일에서 max_display_items 읽기 오류 또는 값 오류: {e}. 기본값 50 사용.")
+            # default_max_items는 이미 50으로 설정됨
+            pass # 오류 발생 시 기본값 사용
+
+    max_display_items = st.slider("최대 표시 항목 수", min_slider_val, max_slider_val, default_max_items)
 
 # 리포트 옵션
 report_options = st.sidebar.expander("리포트 옵션", expanded=False)

@@ -61,7 +61,22 @@ class DXFAIIntegration:
             
         # 프롬프트 템플릿
         self.prompts = self._load_prompts()
-        
+        self.default_timeout = 60 # 초 단위 타임아웃 기본값
+
+    def is_api_key_configured(self, model_type: Optional[str] = None) -> bool:
+        """지정된 모델 또는 전체 AI 서비스 API 키 설정 여부 확인"""
+        if model_type == 'openai':
+            return bool(self.openai_api_key)
+        if model_type == 'claude':
+            return bool(self.claude_api_key and CLAUDE_AVAILABLE and self.claude_client)
+        if model_type == 'gemini':
+            return bool(self.gemini_api_key and GEMINI_AVAILABLE and self.gemini_model)
+
+        # 특정 모델이 지정되지 않으면 하나라도 사용 가능한지 확인
+        return bool(self.openai_api_key or \
+                    (self.claude_api_key and CLAUDE_AVAILABLE and self.claude_client) or \
+                    (self.gemini_api_key and GEMINI_AVAILABLE and self.gemini_model))
+
     def _load_prompts(self) -> Dict[str, str]:
         """프롬프트 템플릿 로드"""
         return {
@@ -305,11 +320,14 @@ CNC 전문가 분석:""",
         return summary
     
     async def _call_openai_async(self, prompt: str) -> str:
-        """비동기 OpenAI API 호출"""
+        """비동기 OpenAI API 호출 (타임아웃 및 상세 오류 처리 추가)"""
+        if not self.is_api_key_configured('openai'):
+            raise ValueError("OpenAI API 키가 설정되지 않았습니다.")
         try:
-            response = await asyncio.to_thread(
-                openai.ChatCompletion.create,
-                model="gpt-4",
+            api_call_task = asyncio.to_thread(
+                openai.ChatCompletion.create, # openai 라이브러리 v0.x.x 기준
+                                             # openai v1.x.x 이상은 openai.chat.completions.create 사용
+                model="gpt-4", # 또는 "gpt-3.5-turbo" 등 사용 가능한 모델
                 messages=[
                     {"role": "system", "content": "당신은 전문 CAD 도면 분석가입니다."},
                     {"role": "user", "content": prompt}
@@ -317,35 +335,63 @@ CNC 전문가 분석:""",
                 max_tokens=1500,
                 temperature=0.7
             )
-            
+            response = await asyncio.wait_for(api_call_task, timeout=self.default_timeout)
             return response.choices[0].message.content
-            
-        except Exception as e:
-            logger.error(f"OpenAI API 호출 오류: {e}")
-            raise
+
+        except openai.error.AuthenticationError as e:
+            logger.error(f"OpenAI API 인증 오류: {e}")
+            raise ConnectionRefusedError(f"OpenAI API 인증 실패: {e}") # 좀 더 일반적인 예외로 변환 가능
+        except openai.error.RateLimitError as e:
+            logger.error(f"OpenAI API 속도 제한 오류: {e}")
+            raise ConnectionAbortedError(f"OpenAI API 속도 제한 초과: {e}") # 좀 더 일반적인 예외로 변환 가능
+        except openai.error.APIError as e:
+            logger.error(f"OpenAI API 일반 오류: {e}")
+            raise RuntimeError(f"OpenAI API 오류: {e}")
+        except asyncio.TimeoutError:
+            logger.error("OpenAI API 호출 시간 초과")
+            raise TimeoutError("OpenAI API 호출 시간 초과")
+        except Exception as e: # 그 외 예상치 못한 오류
+            logger.error(f"OpenAI API 호출 중 알 수 없는 오류: {e}")
+            raise RuntimeError(f"OpenAI API 호출 중 알 수 없는 오류: {e}")
     
     async def _call_claude_async(self, prompt: str) -> str:
-        """비동기 Claude API 호출"""
+        """비동기 Claude API 호출 (타임아웃 및 상세 오류 처리 추가)"""
+        if not self.is_api_key_configured('claude'):
+            raise ValueError("Claude API 키가 설정되지 않았거나 클라이언트 초기화에 실패했습니다.")
         try:
-            response = await asyncio.to_thread(
+            api_call_task = asyncio.to_thread(
                 self.claude_client.messages.create,
-                model="claude-3-sonnet-20240229",
+                model="claude-3-sonnet-20240229", # 또는 다른 claude 모델
                 max_tokens=1500,
                 messages=[
                     {"role": "user", "content": prompt}
                 ]
             )
-            
+            response = await asyncio.wait_for(api_call_task, timeout=self.default_timeout)
             return response.content[0].text
             
+        except anthropic.APIConnectionError as e:
+            logger.error(f"Claude API 연결 오류: {e}")
+            raise ConnectionError(f"Claude API 연결 실패: {e}")
+        except anthropic.RateLimitError as e:
+            logger.error(f"Claude API 속도 제한 오류: {e}")
+            raise ConnectionAbortedError(f"Claude API 속도 제한 초과: {e}")
+        except anthropic.APIStatusError as e: # 일반적인 API 오류 (HTTP 상태 코드 4xx, 5xx 등)
+            logger.error(f"Claude API 상태 오류 (status_code={e.status_code}): {e.message}")
+            raise RuntimeError(f"Claude API 오류 (status={e.status_code}): {e.message}")
+        except asyncio.TimeoutError:
+            logger.error("Claude API 호출 시간 초과")
+            raise TimeoutError("Claude API 호출 시간 초과")
         except Exception as e:
-            logger.error(f"Claude API 호출 오류: {e}")
-            raise
+            logger.error(f"Claude API 호출 중 알 수 없는 오류: {e}")
+            raise RuntimeError(f"Claude API 호출 중 알 수 없는 오류: {e}")
     
     async def _call_gemini_async(self, prompt: str) -> str:
-        """비동기 Gemini API 호출"""
+        """비동기 Gemini API 호출 (타임아웃 및 상세 오류 처리 추가)"""
+        if not self.is_api_key_configured('gemini'):
+            raise ValueError("Gemini API 키가 설정되지 않았거나 모델 초기화에 실패했습니다.")
         try:
-            response = await asyncio.to_thread(
+            api_call_task = asyncio.to_thread(
                 self.gemini_model.generate_content,
                 prompt,
                 generation_config=genai.types.GenerationConfig(
@@ -354,12 +400,22 @@ CNC 전문가 분석:""",
                     temperature=0.7
                 )
             )
-            
+            response = await asyncio.wait_for(api_call_task, timeout=self.default_timeout)
             return response.text
             
+        except google.api_core.exceptions.GoogleAPIError as e: # Gemini API의 일반적인 예외
+            logger.error(f"Gemini API 오류: {e}")
+            if isinstance(e, google.api_core.exceptions.PermissionDenied):
+                 raise ConnectionRefusedError(f"Gemini API 접근 거부: {e}")
+            elif isinstance(e, google.api_core.exceptions.ResourceExhausted):
+                 raise ConnectionAbortedError(f"Gemini API 리소스 고갈 (속도 제한 등): {e}")
+            raise RuntimeError(f"Gemini API 오류: {e}")
+        except asyncio.TimeoutError:
+            logger.error("Gemini API 호출 시간 초과")
+            raise TimeoutError("Gemini API 호출 시간 초과")
         except Exception as e:
-            logger.error(f"Gemini API 호출 오류: {e}")
-            raise
+            logger.error(f"Gemini API 호출 중 알 수 없는 오류: {e}")
+            raise RuntimeError(f"Gemini API 호출 중 알 수 없는 오류: {e}")
     
     def _extract_recommendations(self, ai_response: str) -> List[str]:
         """AI 응답에서 권장사항 추출"""
