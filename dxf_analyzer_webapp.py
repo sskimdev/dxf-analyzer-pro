@@ -127,9 +127,10 @@ if uploaded_file is not None:
                 status_text.text("완료!")
 
                 # 탭으로 결과 구분
-                tab1, tab2, tab3, tab4 = st.tabs(["📊 요약", "📋 상세 정보", "📝 마크다운", "💾 다운로드"])
+                tabs_list = ["📊 요약", "📋 상세 정보", "📝 마크다운", "💾 다운로드", "🧊 3D 뷰어"]
+                tab_summary, tab_details, tab_markdown, tab_download, tab_3d_viewer = st.tabs(tabs_list)
 
-                with tab1:
+                with tab_summary:
                     st.header("📊 분석 요약")
 
                     # 메트릭 표시
@@ -318,6 +319,36 @@ if uploaded_file is not None:
                             file_name=f"{os.path.splitext(uploaded_file.name)[0]}_data.json",
                             mime="application/json",
                             help="구조화된 JSON 형식으로 분석 데이터를 다운로드합니다"
+                        )
+
+                with tab_3d_viewer:
+                    st.header("🧊 3D 뷰어")
+                    st.markdown("DXF 파일을 3D로 시각화합니다. 아래 뷰어에서 파일을 선택하여 로드하세요.")
+                    st.markdown("⚠️ **참고:** 3D 뷰어 기능은 별도의 서버 실행이 필요할 수 있습니다. (`python dxf_3d_visualizer.py`)")
+
+                    # 3D 뷰어 iframe 설정
+                    # 로컬에서 dxf_3d_visualizer.py가 기본 포트 8080으로 실행 중이라고 가정
+                    viewer_url = "http://localhost:8080"
+
+                    # iframe 높이 조절
+                    iframe_height = st.slider("뷰어 높이 조절", min_value=400, max_value=1200, value=600, step=50)
+
+                    try:
+                        # iframe으로 3D 뷰어 임베드
+                        st.components.v1.iframe(viewer_url, height=iframe_height)
+                        st.success("3D 뷰어가 로드되었습니다. 뷰어 내에서 DXF 파일을 선택하여 3D 모델을 확인하세요.")
+                        st.info(
+                            "만약 뷰어가 제대로 표시되지 않는다면, 다음 사항을 확인해주세요:\n"
+                            "1. `dxf_3d_visualizer.py` 서버가 실행 중인지 확인하세요. (터미널에서 `python dxf_3d_visualizer.py` 실행)\n"
+                            "2. 서버가 다른 포트에서 실행 중이라면 `viewer_url`을 수정해야 합니다.\n"
+                            "3. 브라우저 콘솔(F12)에서 오류 메시지를 확인하세요."
+                        )
+                    except Exception as e:
+                        st.error(f"3D 뷰어를 로드하는 중 오류가 발생했습니다: {e}")
+                        st.warning(
+                            "다음 사항을 확인해주세요:\n"
+                            "1. `dxf_3d_visualizer.py` 서버가 실행 중인지 확인하세요. (터미널에서 `python dxf_3d_visualizer.py` 실행)\n"
+                            "2. 방화벽 설정이 3D 뷰어 서버의 포트(기본 8080) 접근을 허용하는지 확인하세요."
                         )
 
             else:

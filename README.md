@@ -18,7 +18,10 @@ AutoCAD DXF 파일을 분석하여 상세한 마크다운 리포트를 생성하
 ### 🖥️ 사용자 인터페이스
 - **GUI 버전**: tkinter 기반의 데스크톱 애플리케이션 (`dxf_analyzer_gui.py`)
 - **웹 버전**: Streamlit 기반의 웹 애플리케이션 (`dxf_analyzer_webapp.py`)
+    - 2D DXF 분석 기능
+    - 3D DXF 뷰어 통합 (별도 서버 `dxf_3d_visualizer.py` 실행 필요)
 - **CLI 버전**: 명령줄 인터페이스로 배치 처리 지원 (`dxf_analyzer.py`)
+- **3D 뷰어 서버**: FastAPI 및 Three.js 기반의 독립 실행형 3D DXF 뷰어 (`dxf_3d_visualizer.py`)
 - **Cloud API**: FastAPI 기반의 REST API 제공 (`dxf_cloud_api.py`)
     - DXF 파일 업로드 및 분석 요청 (기본, 고급, 3D 분석 옵션 제공)
     - JWT 기반 인증 (선택적)
@@ -61,7 +64,18 @@ python dxf_analyzer.py --gui
 
 #### 웹 버전
 ```bash
+# 1. 3D 뷰어 서버 실행 (필요시, 새 터미널에서)
+python dxf_3d_visualizer.py
+
+# 2. 웹 분석기 실행 (다른 터미널에서)
 python dxf_analyzer.py --web
+# 또는 streamlit run dxf_analyzer_webapp.py
+```
+
+#### 3D 뷰어 단독 실행
+```bash
+python dxf_3d_visualizer.py
+# 웹 브라우저에서 http://localhost:8080 (기본값)으로 접속
 ```
 
 #### CLI 버전
@@ -83,11 +97,15 @@ python dxf_analyzer.py --cli input_file.dxf -o custom_report.md
 5. "리포트 내보내기"로 마크다운 파일 저장
 
 ### 웹 버전 사용법
-1. 웹 브라우저에서 애플리케이션 접속
+1. 웹 브라우저에서 애플리케이션 접속 (기본: `http://localhost:8501`)
 2. 드래그 앤 드롭으로 DXF 파일 업로드
 3. 사이드바에서 분석 옵션 설정
 4. "분석 시작" 버튼 클릭
 5. 탭별로 결과 확인 및 다운로드
+   - **요약, 상세 정보, 마크다운, 다운로드**: 기존 2D 분석 결과
+   - **3D 뷰어**: 통합된 3D 뷰어 표시.
+     - 3D 뷰어 기능을 사용하려면 `dxf_3d_visualizer.py` 서버가 실행 중이어야 합니다. (기본: `http://localhost:8080`)
+     - 뷰어 내의 파일 선택 기능을 사용하여 DXF 파일을 로드하고 3D 모델을 확인합니다.
 
 ### CLI 버전 사용법
 ```bash
