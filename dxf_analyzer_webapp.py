@@ -9,14 +9,48 @@ import zipfile
 
 # 페이지 설정
 st.set_page_config(
-    page_title="DXF CAD 도면 분석기",
-    page_icon="📐",
+    page_title="대시보드",  # 변경된 페이지 타이틀
+    page_icon="📊",      # 아이콘 변경 (선택 사항)
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
+    theme="auto"  # 시스템 설정에 따라 라이트/다크 모드 자동 적용
 )
 
+# 커스텀 CSS 적용
+custom_css = """
+<style>
+    /* 메인 콘텐츠 영역의 탭 패널에 패딩 추가 */
+    .stTabs [data-baseweb="tab-panel"] {
+        padding-top: 1.5rem;
+    }
+
+    /* 메트릭 컨테이너에 스타일 추가 */
+    div[data-testid="stMetric"] {
+        background-color: #f0f2f6; /* 라이트 모드 배경 */
+        border: 1px solid #e0e0e0; /* 라이트 모드 보더 */
+        padding: 1rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    /* 다크 모드일 때 메트릭 스타일 */
+    body[data-theme="dark"] div[data-testid="stMetric"] {
+        background-color: #2a2f3b; /* 다크 모드 배경 */
+        border: 1px solid #3a3f4b; /* 다크 모드 보더 */
+    }
+
+    /* 메트릭 레이블의 폰트 두께 조정 */
+    div[data-testid="stMetricLabel"] > div {
+        font-weight: 500;
+    }
+
+</style>
+"""
+st.markdown(custom_css, unsafe_allow_html=True)
+
+
 # 사이드바에 설정 옵션
-st.sidebar.title("📐 DXF 분석기")
+st.sidebar.title("📊 대시보드 설정") # 사이드바 타이틀 변경
 st.sidebar.markdown("---")
 
 # 분석 옵션
@@ -66,8 +100,8 @@ st.sidebar.markdown("---")
 st.sidebar.info("💡 **사용법:**\n1. DXF 파일 업로드\n2. 분석 옵션 설정\n3. '분석 시작' 버튼 클릭")
 
 # 메인 제목
-st.title("🔧 DXF CAD 도면 분석기")
-st.markdown("### AutoCAD DXF 파일을 업로드하여 상세한 분석 리포트를 생성하세요")
+st.title("📊 대시보드") # 변경된 메인 제목
+st.markdown("### DXF 파일을 분석하고 주요 지표를 확인하세요.") # 변경된 부제목
 
 # 파일 업로드
 uploaded_file = st.file_uploader(
@@ -81,11 +115,11 @@ if uploaded_file is not None:
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.metric("파일명", uploaded_file.name)
+        st.metric("📄 파일명", uploaded_file.name)
     with col2:
-        st.metric("파일 크기", f"{uploaded_file.size:,} bytes")
+        st.metric("📦 파일 크기", f"{uploaded_file.size:,} bytes")
     with col3:
-        st.metric("파일 타입", uploaded_file.type)
+        st.metric("🏷️ 파일 타입", uploaded_file.type)
 
     # 분석 시작 버튼
     if st.button("🚀 분석 시작", type="primary", use_container_width=True):
@@ -137,28 +171,28 @@ if uploaded_file is not None:
 
                     with col1:
                         st.metric(
-                            "전체 객체 수",
+                            "🧩 전체 객체 수",
                             f"{analyzer.summary_info['total_entities']:,}",
                             help="DXF 파일에 포함된 모든 객체의 수"
                         )
 
                     with col2:
                         st.metric(
-                            "레이어 수",
+                            "겹겹이 레이어 수",  # "🎨 레이어 수" 또는 "층층이 레이어 수" 등도 고려 가능
                             analyzer.summary_info['layer_count'],
                             help="도면에서 사용된 레이어의 수"
                         )
 
                     with col3:
                         st.metric(
-                            "치수 객체",
+                            "📏 치수 객체",
                             analyzer.summary_info['dimension_count'],
                             help="치수 정보를 담고 있는 객체의 수"
                         )
 
                     with col4:
                         st.metric(
-                            "텍스트 객체",
+                            "📄 텍스트 객체", # "✍️ 텍스트 객체" 등도 고려 가능
                             analyzer.summary_info['text_count'],
                             help="텍스트 및 주석 객체의 수"
                         )
