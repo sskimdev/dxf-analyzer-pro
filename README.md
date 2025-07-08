@@ -20,6 +20,9 @@ AutoCAD DXF 파일을 분석하여 상세한 마크다운 리포트를 생성하
 - **웹 버전**: Streamlit 기반의 웹 애플리케이션 (`dxf_analyzer_webapp.py`)
     - 2D DXF 분석 기능
     - 3D DXF 뷰어 통합 (별도 서버 `dxf_3d_visualizer.py` 실행 필요)
+- **비즈니스 대시보드**: Streamlit 기반의 경영진용 대시보드 (`dxf_business_dashboard.py`)
+    - 종합 현황, 비용, 생산성, 품질, AI 인사이트, 프로젝트 관리 기능 제공
+    - '종합 대시보드'에서 파일 업로드 시 3D DXF 뷰어 통합 (별도 서버 `dxf_3d_visualizer.py` 실행 필요)
 - **CLI 버전**: 명령줄 인터페이스로 배치 처리 지원 (`dxf_analyzer.py`)
 - **3D 뷰어 서버**: FastAPI 및 Three.js 기반의 독립 실행형 3D DXF 뷰어 (`dxf_3d_visualizer.py`)
 - **Cloud API**: FastAPI 기반의 REST API 제공 (`dxf_cloud_api.py`)
@@ -70,6 +73,18 @@ python dxf_3d_visualizer.py
 # 2. 웹 분석기 실행 (다른 터미널에서)
 python dxf_analyzer.py --web
 # 또는 streamlit run dxf_analyzer_webapp.py
+
+# 3. 비즈니스 대시보드 실행 (다른 터미널에서, 필요시)
+# streamlit run dxf_business_dashboard.py
+```
+
+#### 비즈니스 대시보드 실행
+```bash
+# 1. 3D 뷰어 서버 실행 (필요시, 새 터미널에서)
+python dxf_3d_visualizer.py
+
+# 2. 비즈니스 대시보드 실행 (다른 터미널에서)
+streamlit run dxf_business_dashboard.py
 ```
 
 #### 3D 뷰어 단독 실행
@@ -106,6 +121,20 @@ python dxf_analyzer.py --cli input_file.dxf -o custom_report.md
    - **3D 뷰어**: 통합된 3D 뷰어 표시.
      - 3D 뷰어 기능을 사용하려면 `dxf_3d_visualizer.py` 서버가 실행 중이어야 합니다. (기본: `http://localhost:8080`)
      - 뷰어 내의 파일 선택 기능을 사용하여 DXF 파일을 로드하고 3D 모델을 확인합니다.
+
+### 비즈니스 대시보드 사용법
+1. (선택 사항) 3D 모델 뷰어를 사용하려면, 먼저 `dxf_3d_visualizer.py` 서버를 실행합니다.
+   ```bash
+   python dxf_3d_visualizer.py
+   ```
+2. 새 터미널에서 비즈니스 대시보드를 실행합니다.
+   ```bash
+   streamlit run dxf_business_dashboard.py
+   ```
+3. 웹 브라우저에서 대시보드 접속 (기본: `http://localhost:8501` 또는 다른 포트).
+4. 사이드바에서 DXF 파일을 업로드합니다.
+5. '종합 대시보드' 메뉴를 선택하면 업로드된 파일의 분석 결과와 함께 3D 뷰어가 표시됩니다.
+   - 3D 뷰어 서버가 실행 중인 경우, iframe 내에서 파일을 다시 선택하여 3D 모델을 확인할 수 있습니다.
 
 ### CLI 버전 사용법
 ```bash

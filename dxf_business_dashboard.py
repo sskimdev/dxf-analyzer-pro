@@ -206,9 +206,23 @@ class BusinessDashboard:
                                 title="비용 구성"
                             )
                             st.plotly_chart(fig, use_container_width=True)
-                
+
+                        # 3D 뷰어 추가
+                        st.subheader("🧊 3D 모델 뷰어")
+                        st.markdown("⚠️ **참고:** 3D 뷰어 기능을 사용하려면 `dxf_3d_visualizer.py` 서버가 별도로 실행 중이어야 합니다. (기본 포트: 8080)")
+                        viewer_url = "http://localhost:8080"
+                        iframe_height = st.slider("3D 뷰어 높이", min_value=300, max_value=800, value=500, key="3d_viewer_height_dashboard")
+
+                        try:
+                            st.components.v1.iframe(viewer_url, height=iframe_height)
+                            st.info("뷰어 내에서 DXF 파일을 선택하여 3D 모델을 확인하세요.")
+                        except Exception as e_iframe:
+                            st.error(f"3D 뷰어를 로드하는 중 오류 발생: {e_iframe}")
+                            st.warning("`dxf_3d_visualizer.py` 서버가 실행 중인지, 방화벽 설정을 확인해주세요.")
+
                 # 임시 파일 삭제
-                os.remove(temp_path)
+                if os.path.exists(temp_path): # 임시 파일 존재 여부 확인 후 삭제
+                    os.remove(temp_path)
         
         else:
             # 샘플 데이터로 차트 표시
